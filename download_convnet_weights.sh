@@ -12,6 +12,6 @@
 #!/usr/bin/env bash
 #downloading ConvNet pre-trained weights
 mkdir -p ./code/python/cnn/resources
-wget http://cseweb.ucsd.edu/~snakanda/downloads/vista/cnn-weights/alexnet_weights.h5 -P ./code/python/cnn/resources/
-wget http://cseweb.ucsd.edu/~snakanda/downloads/vista/cnn-weights/vgg16_weights.h5 -P ./code/python/cnn/resources/
-wget http://cseweb.ucsd.edu/~snakanda/downloads/vista/cnn-weights/resnet50_weights.h5 -P ./code/python/cnn/resources/
+wget http://cseweb.ucsd.edu/~snakanda/downloads/vista/cnn-weights/alexnet_weights.h5 -P ./spark/code/python/cnn/resources/
+wget http://cseweb.ucsd.edu/~snakanda/downloads/vista/cnn-weights/vgg16_weights.h5 -P ./spark/code/python/cnn/resources/
+wget http://cseweb.ucsd.edu/~snakanda/downloads/vista/cnn-weights/resnet50_weights.h5 -P ./spark/code/python/cnn/resources/
