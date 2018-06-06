@@ -89,4 +89,4 @@ if __name__ == '__main__':
     merged_features_df._jdf.persist(sc._getJavaStorageLevel(storage_level))
     print(downstream_ml_func(merged_features_df, {}, explore_layer_index))
     sc.stop()
-    print("Runtime: " + str((time.time()-prev_time))/60.0)
+    print("Runtime: " + str((time.time()-prev_time)/60.0))
