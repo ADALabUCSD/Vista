@@ -86,7 +86,7 @@ class Vista(object):
         self.mem_sys_rsv = mem_sys_rsv
         self.enable_sys_config_optzs = enable_sys_config_optzs
         self.gpu = gpu
-        self.tot_gpu_memory = tot_gpu_mem
+        self.tot_gpu_mem = tot_gpu_mem
 
         self.inf = 'staged'
         self.operator = 'after-join'
