@@ -46,12 +46,12 @@ class Vista(object):
 
     model_footprints = {
         'alexnet': {'ser': 0.3, 'runtime': 2},
-        'vgg16': {'ser': 0.6, 'runtime': 4},
+        'vgg16': {'ser': 0.6, 'runtime': 3},
         'resnet50': {'ser': 0.2, 'runtime': 1}
     }
 
     def __init__(self, name, mem_sys, cpu_sys, n_nodes, model, n_layers, start_layer, ml_func, struct_input,
-                 image_input, n_records, dS, mem_sys_rsv=3, enable_sys_config_optzs=True):
+                 image_input, n_records, dS, mem_sys_rsv=3, enable_sys_config_optzs=True, gpu=False, tot_gpu_mem=0):
         """
             Initializing the Vista Optimizer
         :param name: Name for the Spark job
@@ -67,6 +67,9 @@ class Vista(object):
         :param n_records: Number of records in the dataset
         :param dS:  Number of structured features
         :param mem_sys_rsv: Amount of memory to be reserved as system reserved memory
+        :param enable_sys_config_optzs: Whether to enable system configurations optimizations (spark configurations and physical plan operators)
+        :param gpu: GPU available
+        :param tot_gpu_mem: If GPU availabel total GPU memory
         """
         self.name = name
         self.mem_sys = math.floor(mem_sys)
@@ -81,7 +84,9 @@ class Vista(object):
         self.n_records = n_records
         self.dS = dS
         self.mem_sys_rsv = mem_sys_rsv
-        self.enable_sys_config_optzs = enable_sys_config_optzs;
+        self.enable_sys_config_optzs = enable_sys_config_optzs
+        self.gpu = gpu
+        self.tot_gpu_memory = tot_gpu_mem
 
         self.inf = 'staged'
         self.operator = 'after-join'
@@ -309,7 +314,14 @@ class Vista(object):
         self.join = join
 
     def __get_cpu_spark(self):
-        for i in reversed(range(1, self.cpu_sys)):
+        if self.gpu:
+            #TODO Here the same CPU runtime footprint is taken as the GPU footprint. This is a conservative estimate and if
+            #TODO a better estimate can be obtained by profiling
+            cpu_max = math.min(floor(self.tot_gpu_mem/Vista.model_footprints[self.model]['runtime']), self.cpu_sys)
+        else:
+            cpu_max = self.cpu_sys
+
+        for i in reversed(range(1, cpu_max)):
             heap = self.mem_sys - Vista.mem_sys_rsv - i * Vista.model_footprints[self.model]['runtime']
             user = i * max((Vista.model_footprints[self.model]['ser'] + Vista.alpha_2 * Vista.max_partition_size),
                            Vista.mem_spark_user_ml_model) + Vista.mem_spark_user_rsv
