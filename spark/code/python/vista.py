@@ -118,12 +118,14 @@ class Vista(object):
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         conf.set("spark.shuffle.reduceLocality.enabled", "false")
 
-        if self.num_partitions > 0:
+        if self.enable_sys_config_optzs and self.num_partitions > 0:
             image_dir_size = get_dir_size(self.image_input)
             if self.num_partitions > image_dir_size / 10485760:
                 conf.set("spark.files.maxPartitionBytes", str(int(math.ceil(image_dir_size / self.num_partitions))))
             else:
                 conf.set("spark.files.maxPartitionBytes", "10485760")  # 10MB
+        else:
+            conf.set("spark.files.maxPartitionBytes", "10485760")  # 10MB
 
         sc = SparkContext.getOrCreate(conf=conf)
         sql_context = SQLContext(sc)
