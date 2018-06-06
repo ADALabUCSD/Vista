@@ -31,15 +31,15 @@ from vista_utils import get_image_features_for_layer, get_feature_projections
 if __name__ == '__main__':
 
     ############################change appropriately###################################
-    model = 'vgg16'
-    layer_index = -1  # from the top
+    model = 'resnet50'
+    layer_index = -4  # from the top
     # images_input = 'hdfs://spark-cluster-master:9000/images'
     # struct_input = 'hdfs://spark-cluster-master:9000/foods.csv'
     images_input = 'file:///home/snakanda/Work/Vista/data/foods/images'
     struct_input = 'file:///home/snakanda/Work/Vista/data/foods/foods.csv'
     heap_memory = 25
     num_executors = 1
-    executor_cpu = 5
+    executor_cpu = 1
     storage_level = StorageLevel(True, True, False, True)# memory and disk deserialized
     sp_core_memory_fraction = 0.6
     ###################################################################################
@@ -72,4 +72,4 @@ if __name__ == '__main__':
 
     print(downstream_ml_func(merged_features_df, {}, layer_index))
     sc.stop()
-    print("Runtime: " + str((time.time()-prev_time))/60.0)
+    print("Runtime: " + str((time.time()-prev_time)/60.0))
