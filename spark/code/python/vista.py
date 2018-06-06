@@ -317,7 +317,7 @@ class Vista(object):
         if self.gpu:
             #TODO Here the same CPU runtime footprint is taken as the GPU footprint. This is a conservative estimate and if
             #TODO a better estimate can be obtained by profiling
-            cpu_max = math.min(floor(self.tot_gpu_mem/Vista.model_footprints[self.model]['runtime']), self.cpu_sys)
+            cpu_max = min(floor(self.tot_gpu_mem/Vista.model_footprints[self.model]['runtime']), self.cpu_sys)
         else:
             cpu_max = self.cpu_sys
 
