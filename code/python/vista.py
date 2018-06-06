@@ -51,8 +51,7 @@ class Vista(object):
     }
 
     def __init__(self, name, mem_sys, cpu_sys, n_nodes, model, n_layers, start_layer, ml_func, struct_input,
-                 image_input,
-                 n_records, dS, mem_sys_rsv=3):
+                 image_input, n_records, dS, mem_sys_rsv=3, enable_sys_config_optzs=True):
         """
             Initializing the Vista Optimizer
         :param name: Name for the Spark job
@@ -82,19 +81,31 @@ class Vista(object):
         self.n_records = n_records
         self.dS = dS
         self.mem_sys_rsv = mem_sys_rsv
+        self.enable_sys_config_optzs = enable_sys_config_optzs;
 
         self.inf = 'staged'
         self.operator = 'after-join'
         self.join = self.__get_join()
-        self.cpu_spark = self.__get_cpu_spark()
-        self.num_partitions = self.__get_num_partitions(self.cpu_spark)
-        self.heap = int(self.__get_heap_size())
-        self.core_memory_fraction = self.__get_spark_core_memory_fraction()
-        self.persistence = self.__get_persistence_format()
-        if self.persistence == 'ser':
-            self.storage_level = StorageLevel(True, True, False, False)
+
+
+        if(self.enable_sys_config_optzs):
+            self.cpu_spark = self.__get_cpu_spark()
+            self.num_partitions = self.__get_num_partitions(self.cpu_spark)
+            self.heap = int(self.__get_heap_size())
+            self.core_memory_fraction = self.__get_spark_core_memory_fraction()
+            self.persistence = self.__get_persistence_format()
+            if self.persistence == 'ser':
+                self.storage_level = StorageLevel(True, True, False, False)
+            else:
+                self.storage_level = StorageLevel(True, True, False, True)
         else:
+            self.cpu_spark = cpu_sys
+            self.num_partitions = -1
+            self.heap = mem_sys - mem_sys_rsv
+            self.core_memory_fraction = 0.6
+            self.persistence = self.__get_persistence_format()
             self.storage_level = StorageLevel(True, True, False, True)
+
 
     def __config_spark(self):
         conf = SparkConf()
@@ -107,7 +118,7 @@ class Vista(object):
         conf.set("spark.shuffle.reduceLocality.enabled", "false")
 
         image_dir_size = get_dir_size(self.image_input)
-        if self.num_partitions > image_dir_size / 10485760:
+        if self.num_partitions > 0 and self.num_partitions > image_dir_size / 10485760:
             conf.set("spark.files.maxPartitionBytes", str(int(math.ceil(image_dir_size / self.num_partitions))))
         else:
             conf.set("spark.files.maxPartitionBytes", "10485760")  # 10MB
@@ -115,7 +126,8 @@ class Vista(object):
         sc = SparkContext.getOrCreate(conf=conf)
         sql_context = SQLContext(sc)
         sql_context.sql("SET spark.sql.autoBroadcastJoinThreshold = -1")
-        sql_context.sql("SET spark.sql.shuffle.partitions = " + str(self.num_partitions))
+        if self.num_partitions > 0:
+            sql_context.sql("SET spark.sql.shuffle.partitions = " + str(self.num_partitions))
 
         return sc, sql_context
 
