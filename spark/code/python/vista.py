@@ -127,8 +127,10 @@ class Vista(object):
 
         sc = SparkContext.getOrCreate(conf=conf)
         sql_context = SQLContext(sc)
-        sql_context.sql("SET spark.sql.autoBroadcastJoinThreshold = -1")
-        if self.num_partitions > 0:
+
+        if self.enable_sys_config_optzs:
+            sql_context.sql("SET spark.sql.autoBroadcastJoinThreshold = -1")
+        if self.enable_sys_config_optzs and self.num_partitions > 0:
             sql_context.sql("SET spark.sql.shuffle.partitions = " + str(self.num_partitions))
 
         return sc, sql_context
