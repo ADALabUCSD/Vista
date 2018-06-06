@@ -246,6 +246,6 @@ def get_dir_size(dir_path):
                 size_in_bytes += int(line.split(" ")[0])
     else:#file://
         dir_path = dir_path.replace('file://', '')
-        size_in_bytes = sum(os.path.getsize(dir_path+"/"+f) for f in os.listdir(dir_path) if os.path.isfile(f))
+        size_in_bytes = sum(os.path.getsize(dir_path+"/"+f) for f in os.listdir(dir_path) if os.path.isfile(dir_path+"/"+f))
 
     return size_in_bytes
