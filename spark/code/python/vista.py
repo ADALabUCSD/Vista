@@ -92,8 +92,10 @@ class Vista(object):
         self.operator = 'after-join'
         self.join = self.__get_join()
 
+
         if(self.enable_sys_config_optzs):
             self.cpu_spark = self.__get_cpu_spark()
+            self.num_partitions = self.__get_num_partitions(self.cpu_spark)
             self.heap = int(self.__get_heap_size())
             self.core_memory_fraction = self.__get_spark_core_memory_fraction()
             self.persistence = self.__get_persistence_format()
@@ -103,12 +105,12 @@ class Vista(object):
                 self.storage_level = StorageLevel(True, True, False, True)
         else:
             self.cpu_spark = cpu_sys
+            self.num_partitions = -1
             self.heap = mem_sys - mem_sys_rsv
             self.core_memory_fraction = 0.6
             self.persistence = self.__get_persistence_format()
             self.storage_level = StorageLevel(True, True, False, True)
 
-        self.num_partitions = self.__get_num_partitions(self.cpu_spark)
 
     def __config_spark(self):
         conf = SparkConf()
@@ -121,9 +123,12 @@ class Vista(object):
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         conf.set("spark.shuffle.reduceLocality.enabled", "false")
 
-        image_dir_size = get_dir_size(self.image_input)
-        if self.num_partitions > image_dir_size / 10485760:
-            conf.set("spark.files.maxPartitionBytes", str(int(math.ceil(image_dir_size / self.num_partitions))))
+        if self.enable_sys_config_optzs and self.num_partitions > 0:
+            image_dir_size = get_dir_size(self.image_input)
+            if self.num_partitions > image_dir_size / 10485760:
+                conf.set("spark.files.maxPartitionBytes", str(int(math.ceil(image_dir_size / self.num_partitions))))
+            else:
+                conf.set("spark.files.maxPartitionBytes", "10485760")  # 10MB
         else:
             conf.set("spark.files.maxPartitionBytes", "10485760")  # 10MB
 
