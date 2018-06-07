@@ -92,8 +92,6 @@ class Vista(object):
         self.operator = 'after-join'
         self.join = self.__get_join()
 
-
-        self.num_partitions = self.__get_num_partitions(self.cpu_spark)
         if(self.enable_sys_config_optzs):
             self.cpu_spark = self.__get_cpu_spark()
             self.heap = int(self.__get_heap_size())
@@ -110,6 +108,7 @@ class Vista(object):
             self.persistence = self.__get_persistence_format()
             self.storage_level = StorageLevel(True, True, False, True)
 
+        self.num_partitions = self.__get_num_partitions(self.cpu_spark)
 
     def __config_spark(self):
         conf = SparkConf()
