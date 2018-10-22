@@ -129,7 +129,7 @@ if __name__ == '__main__':
             text_data = nlp_clean(text_data)
 
     it = LabeledLineSentence(text_data, [str(x) for x in range(size)])
-    model = gensim.models.Doc2Vec(size=300, min_count=0, alpha=0.025, min_alpha=0.025)
+    model = gensim.models.Doc2Vec(size=100, min_count=0, alpha=0.025, min_alpha=0.025)
     model.build_vocab(it)
     model.train(it, total_examples=model.corpus_count, epochs=10)
 
