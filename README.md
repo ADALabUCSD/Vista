@@ -32,7 +32,7 @@ Materialization Trade-offs for Feature Transfer from Deep CNNs for Multimodal Da
     $ ./download_data.sh
     $ python generate_data.py
 ```
-4. Ingest the generated strucutured data file (amazon.csv or foods.csv) and images into HDFS. Alternatively any other input data can be also used. Strucutured file should confirm to the {ID, X_str, y} format without the header and the images directory should contain the resized RGB images (227*227) named after the ID (e.g. ID.jpg).
+4. Ingest the generated structured data file (amazon.csv or foods.csv) and images into HDFS. Alternatively any other input data can be also used. Strucutured file should confirm to the {ID, X_str, y} format without the header and the images directory should contain the resized RGB images (227*227) named after the ID (e.g. ID.jpg).
 ```
     $ hadoop fs -put ./foods.csv    /foods.csv
     $ hadoop fs -put ./images       /images
@@ -46,8 +46,8 @@ Materialization Trade-offs for Feature Transfer from Deep CNNs for Multimodal Da
     /** Instantiation Parameters
      * name         : Name given to the Spark job
      * mem_sys      : System memory of a Spark worker
-     * n_nodes      : Number of nodes in the Spark cluster
      * cpu_sys      : Number of CPUs available in the Spark cluster
+     * n_nodes      : Number of nodes in the Spark cluster
      * model        : ConvNet model name. Possible values -> {'alexnet', 'vgg16', 'resnet50'}
      * n_layers     : Number of layers from the top most layer of the ConvNet to be explored
      * start_layer  : Starting layer of the ConvNet. Use 0 when starting with raw images
