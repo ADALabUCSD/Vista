@@ -1,2 +1,8 @@
 numpy==1.15.0
 tensorflow==1.3.0
+tornado==4.*
+jupyter
+pyspark==2.2.0.post0
+findspark
+pandas
+h5py
