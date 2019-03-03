@@ -29,11 +29,11 @@ from nltk import RegexpTokenizer
 from nltk.corpus import stopwords
 from sklearn.decomposition import PCA
 
-raw_data_files = ['clothing_data.json', 'toys_data.json', 'sports_data.json', 'video_data.json', 'tools_data.json',
-                  'kindle_data.json', 'health_data.json', 'cell_phone_data.json', 'home_data.json',
-                  'books_data.json', 'electronics_data.json', 'cds_data.json', 'movies_data.json']
+raw_data_files = ['clothing_data.json']#, 'toys_data.json', 'sports_data.json', 'video_data.json', 'tools_data.json',
+                  #'kindle_data.json', 'health_data.json', 'cell_phone_data.json', 'home_data.json',
+                  #'books_data.json', 'electronics_data.json', 'cds_data.json', 'movies_data.json']
 
-max_num_of_records = 200000
+max_num_of_records = 20000
 
 nltk.download('stopwords')
 tokenizer = RegexpTokenizer(r'\w+')

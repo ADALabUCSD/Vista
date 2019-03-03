@@ -32,13 +32,16 @@ df['veg'] = df['main_category_en'].map(lambda x: 1 if x == 'Plant-based foods an
 df_new = df[['additives_n', 'ingredients_from_palm_oil_n', 'energy_100g', 'fat_100g', 'saturated-fat_100g',
              'carbohydrates_100g', 'sugars_100g', 'proteins_100g', 'sodium_100g']]
 
-cc = list(combinations(df_new.columns, 2))
-temp1 = pd.concat([df_new[c[1]].mul(df_new[c[0]]) for c in cc], axis=1, keys=cc)
+#cc = list(combinations(df_new.columns, 2))
+#temp1 = pd.concat([df_new[c[1]].mul(df_new[c[0]]) for c in cc], axis=1, keys=cc)
 
-cc = list(combinations(df_new.columns, 3))
-temp2 = pd.concat([df_new[c[2]] * df_new[c[1]] * df_new[c[0]] for c in cc], axis=1, keys=cc)
+#cc = list(combinations(df_new.columns, 3))
+#temp2 = pd.concat([df_new[c[2]] * df_new[c[1]] * df_new[c[0]] for c in cc], axis=1, keys=cc)
 
-df_new = pd.concat([df[['code']], df_new, temp1, temp2, df[['veg']]], axis=1)
+#df_new = pd.concat([df[['code']], df_new, temp1, temp2, df[['veg']]], axis=1)
+#df_new.to_csv('./foods.csv', header=None, index=False)
+
+df_new = pd.concat([df[['code']], df_new, df[['veg']]], axis=1)
 df_new.to_csv('./foods.csv', header=None, index=False)
 
 # train dataset

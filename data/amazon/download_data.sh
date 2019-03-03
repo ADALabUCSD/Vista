@@ -61,11 +61,6 @@ gunzip -k meta_Clothing_Shoes_and_Jewelry.json.gz
 sed "s/'/\"/g" meta_Clothing_Shoes_and_Jewelry.json > clothing_data.json
 rm meta_Clothing_Shoes_and_Jewelry.json*
 
-wget http://jmcauley.ucsd.edu/data/amazon/categoryFiles/meta_Clothing_Shoes_and_Jewelry.json.gz -P ./
-gunzip -k meta_Clothing_Shoes_and_Jewelry.json.gz
-sed "s/'/\"/g" meta_Clothing_Shoes_and_Jewelry.json > electronics_data.json
-rm meta_Clothing_Shoes_and_Jewelry.json*
-
 wget http://jmcauley.ucsd.edu/data/amazon/categoryFiles/meta_CDs_and_Vinyl.json.gz -P ./
 gunzip -k meta_CDs_and_Vinyl.json.gz
 sed "s/'/\"/g" meta_CDs_and_Vinyl.json > cds_data.json
