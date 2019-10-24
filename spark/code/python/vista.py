@@ -70,7 +70,7 @@ class Vista(object):
         :param enable_sys_config_optzs: Whether to enable system configurations optimizations (spark configurations and physical plan operators)
         :param gpu: GPU available
         :param tot_gpu_mem: If GPU availabel total GPU memory
-	    :param ml_model: Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
+	:param ml_model: Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
         """
         self.name = name
         self.mem_sys = math.floor(mem_sys)
@@ -88,7 +88,7 @@ class Vista(object):
         self.enable_sys_config_optzs = enable_sys_config_optzs
         self.gpu = gpu
         self.tot_gpu_mem = tot_gpu_mem
-	    self.model_name = model_name
+	self.model_name = model_name
 
         self.inf = 'staged'
         self.operator = 'after-join'
