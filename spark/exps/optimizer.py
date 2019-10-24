@@ -28,8 +28,8 @@ if __name__ == '__main__':
 
     def downstream_ml_func(features_df, results_dict, layer_index, model_name='LogisticRegression'):
         #----------------------- Logistic Regression ------------------------------
-	    if model_name == 'LogisticRegression':
-	        lr = LogisticRegression(labelCol="label", featuresCol="features", maxIter=50, regParam=0.5)
+	if model_name == 'LogisticRegression':
+	    lr = LogisticRegression(labelCol="label", featuresCol="features", maxIter=50, regParam=0.5)
             train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
             model = lr.fit(train_df)
             predictions = model.transform(test_df)
@@ -37,7 +37,7 @@ if __name__ == '__main__':
         
         #------------------------------- Linear SVC -----------------------------------
         if model_name == 'LinearSVC':
-	        svm = LinearSVC(maxIter=50, regParam=0.5) # 5, 0.01
+	    svm = LinearSVC(maxIter=50, regParam=0.5) # 5, 0.01
             train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
             model = svm.fit(train_df)
             predictions = model.transform(test_df)
@@ -45,7 +45,7 @@ if __name__ == '__main__':
         
         #------------------------------- Decision Tree -----------------------------------
         if model_name == 'DecisionTreeClassifier':
-	        stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
+	    stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
             train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
             si_model = stringIndexer.fit(train_df)
             td = si_model.transform(train_df)
@@ -54,9 +54,9 @@ if __name__ == '__main__':
             predictions = model.transform(test_df)
         # ---------------------------------------------------------------------------------
 
-	    #----------------------- GBT Classifier  ------------------------------
+	#----------------------- GBT Classifier  ------------------------------
         if model_name == 'GBTClassifier':
-	        stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
+	    stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
             train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
             si_model = stringIndexer.fit(train_df)
             td = si_model.transform(train_df)
@@ -65,9 +65,9 @@ if __name__ == '__main__':
             predictions = model.transform(test_df)
         # ------------------------------------------------------------------------        
        
-	    #----------------------- Random Forest Classifier  ------------------------------
+	#----------------------- Random Forest Classifier  ------------------------------
         if model_name == 'RandomForestClassifier':
-	        stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
+	    stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
             train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
             si_model = stringIndexer.fit(train_df)
             td = si_model.transform(train_df)
@@ -76,11 +76,11 @@ if __name__ == '__main__':
             predictions = model.transform(test_df)
         # ------------------------------------------------------------------------ 
 	
-	    #----------------------- OneVsRest  ------------------------------
+	#----------------------- OneVsRest  ------------------------------
         if model_name == 'OneVsRest':
-	        lr = LogisticRegression(labelCol="label", featuresCol="features", maxIter=50, regParam=0.5)
+	    lr = LogisticRegression(labelCol="label", featuresCol="features", maxIter=50, regParam=0.5)
             train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
-	        ovr = OneVsRest(labelCol="label", featuresCol="features", predictionCol="prediction", classifier=lr)
+	    ovr = OneVsRest(labelCol="label", featuresCol="features", predictionCol="prediction", classifier=lr)
             model = lr.fit(train_df)
             predictions = model.transform(test_df)
         # ------------------------------------------------------------------------
