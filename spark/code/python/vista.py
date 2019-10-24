@@ -51,7 +51,7 @@ class Vista(object):
     }
 
     def __init__(self, name, mem_sys, cpu_sys, n_nodes, model, n_layers, start_layer, ml_func, struct_input,
-                 image_input, n_records, dS, mem_sys_rsv=3, enable_sys_config_optzs=True, gpu=False, tot_gpu_mem=0):
+                 image_input, n_records, dS, mem_sys_rsv=3, enable_sys_config_optzs=True, gpu=False, tot_gpu_mem=0, model_name='LogisticRegression'):
         """
             Initializing the Vista Optimizer
         :param name: Name for the Spark job
@@ -70,6 +70,7 @@ class Vista(object):
         :param enable_sys_config_optzs: Whether to enable system configurations optimizations (spark configurations and physical plan operators)
         :param gpu: GPU available
         :param tot_gpu_mem: If GPU availabel total GPU memory
+	    :param ml_model: Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
         """
         self.name = name
         self.mem_sys = math.floor(mem_sys)
@@ -87,6 +88,7 @@ class Vista(object):
         self.enable_sys_config_optzs = enable_sys_config_optzs
         self.gpu = gpu
         self.tot_gpu_mem = tot_gpu_mem
+	    self.model_name = model_name
 
         self.inf = 'staged'
         self.operator = 'after-join'
@@ -189,7 +191,7 @@ class Vista(object):
             for merged_features_df, layer_index in zip(
                     get_feature_projections(sc, sliced_features_df, self.n_layers, shapes),
                     range(1, 1 + self.n_layers)):
-                evaluation_results = self.ml_func(merged_features_df, evaluation_results, -1 * layer_index)
+                evaluation_results = self.ml_func(merged_features_df, evaluation_results, -1 * layer_index, model_name=self.model_name)
 
             features_df._jdf.unpersist()
         elif self.inf == 'staged':
@@ -222,7 +224,7 @@ class Vista(object):
 
                 merged_features_df = get_feature_projections(sc, features_df, 1, [shape])[0]
 
-                evaluation_results = self.ml_func(merged_features_df, evaluation_results, layer_index)
+                evaluation_results = self.ml_func(merged_features_df, evaluation_results, layer_index, model_name=self.model_name)
 
                 if features_df_prev is not None: features_df_prev._jdf.unpersist()
                 features_df_prev = features_df
@@ -253,7 +255,7 @@ class Vista(object):
                 shape = ResNet50.transfer_layers_shapes[self.start_layer]
 
             merged_features_df = get_feature_projections(sc, features_df, 1, [shape])[0]
-            evaluation_results = self.ml_func(merged_features_df, evaluation_results, self.start_layer)
+            evaluation_results = self.ml_func(merged_features_df, evaluation_results, self.start_layer, model_name=self.model_name)
 
         input_df = features_df.select(col('id'), col('features'), col('label'),
                                       serialize_cnn_features_udf(sc, col('image_features')).alias('input_layer'))
@@ -275,7 +277,7 @@ class Vista(object):
             for merged_features_df, layer_index in zip(
                     get_feature_projections(sc, sliced_features_df, num_layers_to_explore, shapes),
                     range(1, 1 + self.n_layers)):
-                evaluation_results = self.ml_func(merged_features_df, evaluation_results, -1 * layer_index)
+                evaluation_results = self.ml_func(merged_features_df, evaluation_results, -1 * layer_index, model_name=self.model_name)
                 prev_features_df._jdf.unpersist()
 
             features_df._jdf.unpersist()
@@ -288,7 +290,7 @@ class Vista(object):
                 features_df._jdf.persist(sc._getJavaStorageLevel(self.storage_level))
 
                 merged_features_df = get_feature_projections(sc, features_df, 1, [shape])[0]
-                evaluation_results = self.ml_func(merged_features_df, evaluation_results, layer_index)
+                evaluation_results = self.ml_func(merged_features_df, evaluation_results, layer_index, model_name=self.model_name)
 
                 prev_features_df._jdf.unpersist()
                 prev_features_df = features_df
@@ -393,6 +395,6 @@ class Vista(object):
 if __name__ == "__main__":
     vista = Vista("vista-example", 32, 8, 8, 'alexnet', 4, 0, downstream_ml_func,
                   'hdfs://spark-cluster-master:9000/foods.csv',
-                  'hdfs://spark-cluster-master:9000/images', 20129, 130)
+                  'hdfs://spark-cluster-master:9000/images', 20129, 130, model_name='LogisticRegression')
 
     print(vista.run())
