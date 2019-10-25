@@ -37,7 +37,7 @@ if __name__ == '__main__':
         
         #------------------------------- Linear SVC -----------------------------------
         if model_name == 'LinearSVC':
-	    svm = LinearSVC(maxIter=50, regParam=0.5) # 5, 0.01
+	    svm = LinearSVC(maxIter=5, regParam=0.01) # 5, 0.01
             train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
             model = svm.fit(train_df)
             predictions = model.transform(test_df)
