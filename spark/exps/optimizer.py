@@ -13,9 +13,8 @@ limitations under the License.
 '''
 
 import sys
-#sys.path.append('../code/python')
-sys.path.append('/home/ubuntu/vista/spark/code/python')
-sys.path.append('/home/ubuntu/vista/spark/code/python/cnn')
+sys.path.append('../code/python')
+sys.path.append('../code/python/cnn')
 from vista import Vista
 
 from pyspark.ml.classification import LogisticRegression, LinearSVC, DecisionTreeClassifier, GBTClassifier, RandomForestClassifier, MultilayerPerceptronClassifier, OneVsRest
