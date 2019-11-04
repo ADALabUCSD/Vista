@@ -56,9 +56,11 @@ Materialization Trade-offs for Feature Transfer from Deep CNNs for Multimodal Da
      * images_input : Input path to the images
      * n            : Number of total records
      * dS           : number of structured features
+     * model_name   : Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
     **/
     vista = Vista("vista-example", 32, 8, 8, 'alexnet', 4, 0, downstream_ml_func, 'hdfs://../foods.csv',
-                      'hdfs://.../images', 20129, 130)
+                      'hdfs://.../images', 20129, 130, model_name='LogisticRegression')
+    //possible values for model_name -> {'LogisticRegression', 'LinearSVC', 'DecisionTreeClassifier', 'GBTClassifier', 'RandomForestClassifier', 'OneVsRest'}
 
     //Optional: overriding system picked decisions
     vista.override_inference_type('bulk')               //posible value -> {'bulk', 'staged'}

@@ -28,17 +28,45 @@ if __name__ == '__main__':
     def downstream_ml_func(features_df, results_dict, layer_index, model_name='LogisticRegression'):
         #----------------------- Logistic Regression ------------------------------
 	if model_name == 'LogisticRegression':
-	    lr = LogisticRegression(labelCol="label", featuresCol="features", maxIter=50, regParam=0.5)
-            train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
-            model = lr.fit(train_df)
+	    train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
+
+            lr = LogisticRegression(labelCol="label", featuresCol="features", maxIter=10, regParam=0.1)
+            pipeline = Pipeline(stages=[lr])
+
+            paramGrid = ParamGridBuilder() \
+                .addGrid(lr.maxIter, [10, 20, 50]) \
+                .addGrid(lr.regParam, [0.01, 0.1, 0.5]) \
+                .build()
+
+            crossval = CrossValidator(estimator=pipeline,
+                                      estimatorParamMaps=paramGrid,
+                                      evaluator=MulticlassClassificationEvaluator(),
+                                      numFolds=3)
+
+            # Run cross-validation, and choose the best set of parameters.
+            model = crossval.fit(train_df)
+
             predictions = model.transform(test_df)
         # ------------------------------------------------------------------------
         
         #------------------------------- Linear SVC -----------------------------------
         if model_name == 'LinearSVC':
-	    svm = LinearSVC(maxIter=5, regParam=0.01) # 5, 0.01
+	    svm = LinearSVC(maxIter=5, regParam=0.01)
             train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
-            model = svm.fit(train_df)
+            pipeline = Pipeline(stages=[svm])
+
+            paramGrid = ParamGridBuilder() \
+                          .addGrid(svm.regParam, [0.01, 0.1, 0.5]) \
+                          .addGrid(svm.maxIter, [5, 10, 20]) \
+                          .build()
+
+            crossval = CrossValidator(estimator=pipeline,\
+                          estimatorParamMaps=paramGrid,\
+                          evaluator=MulticlassClassificationEvaluator(),\
+                          numFolds=3)
+
+            model = crossval.fit(train_df)
+
             predictions = model.transform(test_df)
         # --------------------------------------------------------------------------
         
@@ -49,7 +77,21 @@ if __name__ == '__main__':
             si_model = stringIndexer.fit(train_df)
             td = si_model.transform(train_df)
             dt = DecisionTreeClassifier(maxDepth=2, labelCol="indexed")
-            model = dt.fit(td)
+
+            pipeline = Pipeline(stages=[dt])
+
+            paramGrid = ParamGridBuilder() \
+                          .addGrid(dt.maxDepth, [2, 5, 10, 15, 20, 25, 30]) \
+                          .build()
+
+            crossval = CrossValidator(estimator=pipeline,\
+                          estimatorParamMaps=paramGrid,\
+                          evaluator=MulticlassClassificationEvaluator(),\
+                          numFolds=3)
+
+            model = crossval.fit(td)
+
+            #model = dt.fit(td)
             predictions = model.transform(test_df)
         # ---------------------------------------------------------------------------------
 
@@ -59,8 +101,22 @@ if __name__ == '__main__':
             train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
             si_model = stringIndexer.fit(train_df)
             td = si_model.transform(train_df)
-            gbt = GBTClassifier(labelCol="label", featuresCol="features", maxIter=50)
-            model = gbt.fit(td)
+            gbt = GBTClassifier(labelCol="label", featuresCol="features", maxIter=50, maxDepth=5)
+
+            pipeline = Pipeline(stages=[gbt])
+
+            paramGrid = ParamGridBuilder() \
+                          .addGrid(gbt.maxDepth, [2, 5, 10, 20, 30]) \
+                          .addGrid(gbt.maxIter, [5, 10, 20, 50]) \
+                          .build()
+
+            crossval = CrossValidator(estimator=pipeline,\
+                          estimatorParamMaps=paramGrid,\
+                          evaluator=MulticlassClassificationEvaluator(),\
+                          numFolds=3)
+
+            model = crossval.fit(td)
+
             predictions = model.transform(test_df)
         # ------------------------------------------------------------------------        
        
@@ -71,7 +127,21 @@ if __name__ == '__main__':
             si_model = stringIndexer.fit(train_df)
             td = si_model.transform(train_df)
             rfc = RandomForestClassifier(labelCol="label", featuresCol="features")
-            model = rfc.fit(td)
+
+            pipeline = Pipeline(stages=[rfc])
+
+            paramGrid = ParamGridBuilder() \
+                          .addGrid(rfc.maxDepth, [5, 10, 20, 30]) \
+                          .addGrid(rfc.numTrees, [10, 20, 50]) \
+                          .build()
+
+            crossval = CrossValidator(estimator=pipeline,\
+                          estimatorParamMaps=paramGrid,\
+                          evaluator=MulticlassClassificationEvaluator(),\
+                          numFolds=3)
+
+            model = crossval.fit(td)
+
             predictions = model.transform(test_df)
         # ------------------------------------------------------------------------ 
 	
@@ -80,7 +150,7 @@ if __name__ == '__main__':
 	    lr = LogisticRegression(labelCol="label", featuresCol="features", maxIter=50, regParam=0.5)
             train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
 	    ovr = OneVsRest(labelCol="label", featuresCol="features", predictionCol="prediction", classifier=lr)
-            model = lr.fit(train_df)
+            model = ovr.fit(train_df)
             predictions = model.transform(test_df)
         # ------------------------------------------------------------------------
 	 
@@ -94,10 +164,10 @@ if __name__ == '__main__':
     vista = Vista("vista-example", 32, 8, 8, 'alexnet', 3, 0, downstream_ml_func, 'hdfs://spark-master:9000/foods_sample.csv',
                       'hdfs://spark-master:9000/foods_images', 20129, 130, mem_sys_rsv=3, model_name='LogisticRegression')
 
-    # Optional overrides
-    vista.override_inference_type('bulk')
-    vista.override_join('s')
-    vista.overrdide_operator_placement('before-join')
+    # Optional overrides (may uncomment/choose override option of any/all as needed)
+    #vista.override_inference_type('bulk')
+    #vista.override_join('s')
+    #vista.overrdide_operator_placement('before-join')
 
     print(vista.run())
     print("Runtime: " + str((time.time()-prev_time)/60.0))
