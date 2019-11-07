@@ -57,10 +57,15 @@ Materialization Trade-offs for Feature Transfer from Deep CNNs for Multimodal Da
      * n            : Number of total records
      * dS           : number of structured features
      * model_name   : Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
+     * extra_config : Extra configuration settings for hyperparameter tuning with the downstream model
     **/
     vista = Vista("vista-example", 32, 8, 8, 'alexnet', 4, 0, downstream_ml_func, 'hdfs://../foods.csv',
-                      'hdfs://.../images', 20129, 130, model_name='LogisticRegression')
+                      'hdfs://.../images', 20129, 130, model_name='LogisticRegression', extra_config={})
+    
     //possible values for model_name -> {'LogisticRegression', 'LinearSVC', 'DecisionTreeClassifier', 'GBTClassifier', 'RandomForestClassifier', 'OneVsRest'}
+    
+    // extra_config takes in a dictionary of chosen model's attribute names and list of values to explore as key-value pairs for k-Fold Cross Validation. It can also take `numFolds` for the k value. 
+    // extra_config is applicable for all currently supported downstream models except 'OneVsRest'.
 
     //Optional: overriding system picked decisions
     vista.override_inference_type('bulk')               //posible value -> {'bulk', 'staged'}
