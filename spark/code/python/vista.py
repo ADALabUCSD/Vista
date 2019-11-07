@@ -11,7 +11,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 '''
-import math
+import math, time
 
 from pyspark import SparkConf, SparkContext, StorageLevel
 from pyspark.sql import SQLContext
@@ -22,9 +22,88 @@ from cnn.resnet50 import ResNet50
 from cnn.vgg16 import VGG16
 
 from vista_utils import get_dir_size, get_struct_df, get_images_df, get_joined_features, image_to_byte_arr_udf, \
-    get_image_features_for_layer, get_feature_projections, serialize_cnn_features_udf, downstream_ml_func, \
+    get_image_features_for_layer, get_feature_projections, serialize_cnn_features_udf, \
     get_all_image_features, slice_layers_udf
 
+import sys
+sys.path.append('../code/python')
+sys.path.append('../code/python/cnn')
+
+from pyspark.ml import Pipeline
+from pyspark.ml.classification import LogisticRegression, LinearSVC, DecisionTreeClassifier, GBTClassifier, RandomForestClassifier, MultilayerPerceptronClassifier, OneVsRest
+from pyspark.ml.evaluation import MulticlassClassificationEvaluator
+from pyspark.ml.feature import StringIndexer
+from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
+
+def downstream_ml_func(features_df, results_dict, layer_index, model_name='LogisticRegression', extra_config={}):
+
+    def hyperparameter_tuned_model(clf, train_df):
+	pipeline = Pipeline(stages=[clf])
+
+        paramGrid = ParamGridBuilder()
+        for i in extra_config:
+	    if i == 'numFolds':
+                continue
+            paramGrid = paramGrid.addGrid(eval('clf.'+i), extra_config[i])
+
+        paramGrid = paramGrid.build()
+
+	if 'numFolds' in extra_config:
+	    numFolds = extra_config['numFolds']
+	else:
+	    numFolds = 3 # default
+
+        crossval = CrossValidator(estimator=pipeline,
+                      estimatorParamMaps=paramGrid,
+                      evaluator=MulticlassClassificationEvaluator(),
+                      numFolds=numFolds)
+        # Run cross-validation, and choose the best set of parameters.
+        return crossval.fit(train_df)
+
+    train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
+
+    if model_name == 'LogisticRegression':
+        clf = LogisticRegression(labelCol="label", featuresCol="features", maxIter=10, regParam=0.1)
+
+    if model_name == 'LinearSVC':
+        clf = LinearSVC(maxIter=5, regParam=0.01)
+    
+    if model_name == 'DecisionTreeClassifier':
+        stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
+        si_model = stringIndexer.fit(train_df)
+        train_df = si_model.transform(train_df)
+        
+	clf = DecisionTreeClassifier(maxDepth=2, labelCol="indexed")
+
+    if model_name == 'GBTClassifier':
+        stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
+        si_model = stringIndexer.fit(train_df)
+        train_df = si_model.transform(train_df)
+        
+	clf = GBTClassifier(labelCol="label", featuresCol="features", maxIter=50, maxDepth=5)
+    
+    if model_name == 'RandomForestClassifier':
+        stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
+        si_model = stringIndexer.fit(train_df)
+        td = si_model.transform(train_df)
+        
+	clf = RandomForestClassifier(labelCol="label", featuresCol="features")
+    
+    if model_name == 'OneVsRest':
+        lr = LogisticRegression(labelCol="label", featuresCol="features", maxIter=50, regParam=0.5)
+        clf = OneVsRest(labelCol="label", featuresCol="features", predictionCol="prediction", classifier=lr)
+    
+    if extra_config != {}:
+        model = hyperparameter_tuned_model(clf, train_df)
+    else:
+        model = clf.fit(train_df)
+
+    predictions = model.transform(test_df)
+
+    evaluator = MulticlassClassificationEvaluator(labelCol="label", predictionCol="prediction",
+                metricName="accuracy")
+    results_dict[layer_index] = evaluator.evaluate(predictions)
+    return results_dict
 
 class Vista(object):
     """
@@ -51,7 +130,7 @@ class Vista(object):
     }
 
     def __init__(self, name, mem_sys, cpu_sys, n_nodes, model, n_layers, start_layer, ml_func, struct_input,
-                 image_input, n_records, dS, mem_sys_rsv=3, enable_sys_config_optzs=True, gpu=False, tot_gpu_mem=0, model_name='LogisticRegression'):
+                 image_input, n_records, dS, mem_sys_rsv=3, enable_sys_config_optzs=True, gpu=False, tot_gpu_mem=0, model_name='LogisticRegression', extra_config={}):
         """
             Initializing the Vista Optimizer
         :param name: Name for the Spark job
@@ -70,7 +149,8 @@ class Vista(object):
         :param enable_sys_config_optzs: Whether to enable system configurations optimizations (spark configurations and physical plan operators)
         :param gpu: GPU available
         :param tot_gpu_mem: If GPU availabel total GPU memory
-	:param model_name: Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
+	:param ml_model: Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
+	:param extra_config: Extra configuration settings for hyperparameter tuning with the downstream model
         """
         self.name = name
         self.mem_sys = math.floor(mem_sys)
@@ -89,6 +169,7 @@ class Vista(object):
         self.gpu = gpu
         self.tot_gpu_mem = tot_gpu_mem
 	self.model_name = model_name
+	self.extra_config = extra_config
 
         self.inf = 'staged'
         self.operator = 'after-join'
@@ -142,6 +223,20 @@ class Vista(object):
         if self.enable_sys_config_optzs and self.num_partitions > 0:
             sql_context.sql("SET spark.sql.shuffle.partitions = " + str(self.num_partitions))
 
+
+	if self.model_name == 'OneVsRest' and self.extra_config != {}:
+	    raise Exception('OneVsRest does not support any additional configurations and extra_config needs to be ignored with OneVsRest.')
+
+	if self.extra_config != {}:
+            mdl = eval(self.model_name)()
+            for i in self.extra_config:
+		if i == 'numFolds':
+		    continue
+                if not mdl.hasParam(i):
+                    raise AttributeError(self.model_name + ' has no attribute \'' + i + '\'')
+                if type(self.extra_config[i]) != list:
+                    raise TypeError('The specified parameter(s) of ', i, 'in extra_config must be in a list!')
+
         return sc, sql_context
 
     def run(self):
@@ -149,13 +244,14 @@ class Vista(object):
             Launch the CNN feature transfer workload
         :return:
         """
-        print(
+        sc, sql_context = self.__config_spark()
+
+	print(
         'Vista Configs(join, cpu, np, heap, f_core, pers): ' + ", ".join([str(x) for x in [self.join, self.cpu_spark,
                                                                                            self.num_partitions,
                                                                                            self.heap,
                                                                                            self.core_memory_fraction,
                                                                                            self.persistence]]))
-        sc, sql_context = self.__config_spark()
 
         # using a pre-materialized layer
         if (self.start_layer != 0):
@@ -191,7 +287,7 @@ class Vista(object):
             for merged_features_df, layer_index in zip(
                     get_feature_projections(sc, sliced_features_df, self.n_layers, shapes),
                     range(1, 1 + self.n_layers)):
-                evaluation_results = self.ml_func(merged_features_df, evaluation_results, -1 * layer_index, model_name=self.model_name)
+                evaluation_results = self.ml_func(merged_features_df, evaluation_results, -1 * layer_index, model_name=self.model_name, extra_config=self.extra_config)
 
             features_df._jdf.unpersist()
         elif self.inf == 'staged':
@@ -224,7 +320,7 @@ class Vista(object):
 
                 merged_features_df = get_feature_projections(sc, features_df, 1, [shape])[0]
 
-                evaluation_results = self.ml_func(merged_features_df, evaluation_results, layer_index, model_name=self.model_name)
+                evaluation_results = self.ml_func(merged_features_df, evaluation_results, layer_index, model_name=self.model_name, extra_config=self.extra_config)
 
                 if features_df_prev is not None: features_df_prev._jdf.unpersist()
                 features_df_prev = features_df
@@ -255,7 +351,7 @@ class Vista(object):
                 shape = ResNet50.transfer_layers_shapes[self.start_layer]
 
             merged_features_df = get_feature_projections(sc, features_df, 1, [shape])[0]
-            evaluation_results = self.ml_func(merged_features_df, evaluation_results, self.start_layer, model_name=self.model_name)
+            evaluation_results = self.ml_func(merged_features_df, evaluation_results, self.start_layer, model_name=self.model_name, extra_config=self.extra_config)
 
         input_df = features_df.select(col('id'), col('features'), col('label'),
                                       serialize_cnn_features_udf(sc, col('image_features')).alias('input_layer'))
@@ -277,7 +373,7 @@ class Vista(object):
             for merged_features_df, layer_index in zip(
                     get_feature_projections(sc, sliced_features_df, num_layers_to_explore, shapes),
                     range(1, 1 + self.n_layers)):
-                evaluation_results = self.ml_func(merged_features_df, evaluation_results, -1 * layer_index, model_name=self.model_name)
+                evaluation_results = self.ml_func(merged_features_df, evaluation_results, -1 * layer_index, model_name=self.model_name, extra_config=self.extra_config)
                 prev_features_df._jdf.unpersist()
 
             features_df._jdf.unpersist()
@@ -290,7 +386,7 @@ class Vista(object):
                 features_df._jdf.persist(sc._getJavaStorageLevel(self.storage_level))
 
                 merged_features_df = get_feature_projections(sc, features_df, 1, [shape])[0]
-                evaluation_results = self.ml_func(merged_features_df, evaluation_results, layer_index, model_name=self.model_name)
+                evaluation_results = self.ml_func(merged_features_df, evaluation_results, layer_index, model_name=self.model_name, extra_config=self.extra_config)
 
                 prev_features_df._jdf.unpersist()
                 prev_features_df = features_df
@@ -393,8 +489,15 @@ class Vista(object):
 
 
 if __name__ == "__main__":
-    vista = Vista("vista-example", 32, 8, 8, 'alexnet', 4, 0, downstream_ml_func,
-                  'hdfs://spark-cluster-master:9000/foods.csv',
-                  'hdfs://spark-cluster-master:9000/images', 20129, 130, model_name='LogisticRegression')
+    prev_time = time.time()
+    # mem_sys_rsv is an optional parameter. If not set a default value of 3 will be used.
+    vista = Vista("vista-example", 32, 8, 8, 'alexnet', 3, 0, downstream_ml_func, 'hdfs://spark-master:9000/foods_sample.csv',
+                      'hdfs://spark-master:9000/foods_images', 20129, 130, mem_sys_rsv=3, model_name='LogisticRegression', extra_config={})
+
+    # Optional overrides
+    #vista.override_inference_type('bulk')
+    #vista.override_join('s')
+    #vista.overrdide_operator_placement('before-join')
 
     print(vista.run())
+    print("Runtime: " + str((time.time()-prev_time)/60.0))
