@@ -76,9 +76,9 @@ Materialization Trade-offs for Feature Transfer from Deep CNNs for Multimodal Da
     //Starting the ConvNet feature transfer workload
     print(vista.run())
 ```
-7. To submit the Spark job use the following command. We recommend using atleast 4GB of Spark driver memory. optimizer.py should be changed to point to the correct python script.
+7. To submit the Spark job use the following command. We recommend using atleast 4GB of Spark driver memory. vista.py should be changed to point to the correct python script.
 ```
-    $ spark-submit --master <spark-master-url> --driver-memory 8g --packages databricks:tensorframes:0.2.9-s_2.11 --jars ../code/scala/target/scala-2.11/vista-udfs_2.11-1.0.jar optimizer.py
+    $ spark-submit --master <spark-master-url> --driver-memory 8g --packages databricks:tensorframes:0.2.9-s_2.11 --jars ../code/scala/target/scala-2.11/vista-udfs_2.11-1.0.jar vista.py
 ```
 
 ### Limitations
