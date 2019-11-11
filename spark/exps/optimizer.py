@@ -13,9 +13,8 @@ limitations under the License.
 '''
 
 import sys
-#sys.path.append('../code/python')
-sys.path.append('/home/ubuntu/vista/spark/code/python')
-sys.path.append('/home/ubuntu/vista/spark/code/python/cnn')
+sys.path.append('../code/python')
+sys.path.append('../code/python/cnn')
 from vista import Vista
 
 from pyspark.ml.classification import LogisticRegression, LinearSVC, DecisionTreeClassifier, GBTClassifier, RandomForestClassifier, MultilayerPerceptronClassifier, OneVsRest
@@ -54,7 +53,7 @@ if __name__ == '__main__':
         train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
 
         if model_name == 'LogisticRegression':
-            clf = LogisticRegression(labelCol="label", featuresCol="features", maxIter=10, regParam=0.1)
+            clf = LogisticRegression(labelCol="label", featuresCol="features", maxIter=50, regParam=0.1)
 
         if model_name == 'LinearSVC':
             clf = LinearSVC(maxIter=50, regParam=0.01)
