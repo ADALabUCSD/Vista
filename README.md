@@ -51,14 +51,20 @@ Materialization Trade-offs for Feature Transfer from Deep CNNs for Multimodal Da
      * model        : ConvNet model name. Possible values -> {'alexnet', 'vgg16', 'resnet50'}
      * n_layers     : Number of layers from the top most layer of the ConvNet to be explored
      * start_layer  : Starting layer of the ConvNet. Use 0 when starting with raw images
-     * ml_func      : Function pointer to the downstream ML model
      * struct_input : Input path to the strucutred input
      * images_input : Input path to the images
      * n            : Number of total records
      * dS           : number of structured features
+     * model_name   : Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
+     * extra_config : Extra configuration settings for hyperparameter tuning with the downstream model
     **/
-    vista = Vista("vista-example", 32, 8, 8, 'alexnet', 4, 0, downstream_ml_func, 'hdfs://../foods.csv',
-                      'hdfs://.../images', 20129, 130)
+    vista = Vista("vista-example", 32, 8, 8, 'alexnet', 4, 0, 'hdfs://../foods.csv',
+                      'hdfs://.../images', 20129, 130, model_name='LogisticRegression', extra_config={})
+    
+    //possible values for model_name -> {'LogisticRegression', 'LinearSVC', 'DecisionTreeClassifier', 'GBTClassifier', 'RandomForestClassifier', 'OneVsRest'}
+    
+    // extra_config takes in a dictionary of chosen model's attribute names and list of values to explore as key-value pairs for k-Fold Cross Validation. It can also take `numFolds` for the k value. 
+    // extra_config is applicable for all currently supported downstream models except 'OneVsRest'.
 
     //Optional: overriding system picked decisions
     vista.override_inference_type('bulk')               //posible value -> {'bulk', 'staged'}
@@ -69,9 +75,9 @@ Materialization Trade-offs for Feature Transfer from Deep CNNs for Multimodal Da
     //Starting the ConvNet feature transfer workload
     print(vista.run())
 ```
-7. To submit the Spark job use the following command. We recommend using atleast 4GB of Spark driver memory. optimizer.py should be changed to point to the correct python script.
+7. To submit the Spark job use the following command. We recommend using atleast 4GB of Spark driver memory. vista.py should be changed to point to the correct python script.
 ```
-    $ spark-submit --master <spark-master-url> --driver-memory 8g --packages databricks:tensorframes:0.2.9-s_2.11 --jars ../code/scala/target/scala-2.11/vista-udfs_2.11-1.0.jar optimizer.py
+    $ spark-submit --master <spark-master-url> --driver-memory 8g --packages databricks:tensorframes:0.2.9-s_2.11 --jars ../code/scala/target/scala-2.11/vista-udfs_2.11-1.0.jar vista.py
 ```
 
 ### Limitations
