@@ -51,7 +51,6 @@ Materialization Trade-offs for Feature Transfer from Deep CNNs for Multimodal Da
      * model        : ConvNet model name. Possible values -> {'alexnet', 'vgg16', 'resnet50'}
      * n_layers     : Number of layers from the top most layer of the ConvNet to be explored
      * start_layer  : Starting layer of the ConvNet. Use 0 when starting with raw images
-     * ml_func      : Function pointer to the downstream ML model
      * struct_input : Input path to the strucutred input
      * images_input : Input path to the images
      * n            : Number of total records
@@ -59,7 +58,7 @@ Materialization Trade-offs for Feature Transfer from Deep CNNs for Multimodal Da
      * model_name   : Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
      * extra_config : Extra configuration settings for hyperparameter tuning with the downstream model
     **/
-    vista = Vista("vista-example", 32, 8, 8, 'alexnet', 4, 0, downstream_ml_func, 'hdfs://../foods.csv',
+    vista = Vista("vista-example", 32, 8, 8, 'alexnet', 4, 0, 'hdfs://../foods.csv',
                       'hdfs://.../images', 20129, 130, model_name='LogisticRegression', extra_config={})
     
     //possible values for model_name -> {'LogisticRegression', 'LinearSVC', 'DecisionTreeClassifier', 'GBTClassifier', 'RandomForestClassifier', 'OneVsRest'}
