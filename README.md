@@ -58,7 +58,7 @@ Materialization Trade-offs for Feature Transfer from Deep CNNs for Multimodal Da
      * model_name    : Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
      * extra_config  : Extra configuration settings for hyperparameter tuning with the downstream model
      * tuning_method : Method (TrainValidationSplit / CrossValidator) to use for hyperparameter tuning.
-	 * seed          : Random Seed to set for all data split / algorithm training tasks for reproducibility in result. 
+     * seed          : Random Seed to set for all data split / algorithm training tasks for reproducibility in result. 
     **/
     vista = Vista("vista-example", 32, 8, 8, 'alexnet', 4, 0, 'hdfs://../foods.csv',
                       'hdfs://.../images', 20129, 130, model_name='LogisticRegression', extra_config={}, 
