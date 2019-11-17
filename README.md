@@ -44,24 +44,28 @@ Materialization Trade-offs for Feature Transfer from Deep CNNs for Multimodal Da
 6. Go to /exps directory and copy the optimizer.py to a different file. Change the content of the file for your requirement. The first important thing is creating an instance of Vista class by providing all the inputs and configuration values. After this the optimizer will make decisions and pick values for the logical plan, physical plan operators and Spark config values. Alternative the user can override the optimizer picked decisions.
 ```
     /** Instantiation Parameters
-     * name         : Name given to the Spark job
-     * mem_sys      : System memory of a Spark worker
-     * n_nodes      : Number of nodes in the Spark cluster
-     * cpu_sys      : Number of CPUs available in the Spark cluster
-     * model        : ConvNet model name. Possible values -> {'alexnet', 'vgg16', 'resnet50'}
-     * n_layers     : Number of layers from the top most layer of the ConvNet to be explored
-     * start_layer  : Starting layer of the ConvNet. Use 0 when starting with raw images
-     * struct_input : Input path to the strucutred input
-     * images_input : Input path to the images
-     * n            : Number of total records
-     * dS           : number of structured features
-     * model_name   : Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
-     * extra_config : Extra configuration settings for hyperparameter tuning with the downstream model
+     * name          : Name given to the Spark job
+     * mem_sys       : System memory of a Spark worker
+     * n_nodes       : Number of nodes in the Spark cluster
+     * cpu_sys       : Number of CPUs available in the Spark cluster
+     * model         : ConvNet model name. Possible values -> {'alexnet', 'vgg16', 'resnet50'}
+     * n_layers      : Number of layers from the top most layer of the ConvNet to be explored
+     * start_layer   : Starting layer of the ConvNet. Use 0 when starting with raw images
+     * struct_input  : Input path to the structured input
+     * images_input  : Input path to the images
+     * n             : Number of total records
+     * dS            : number of structured features
+     * model_name    : Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
+     * extra_config  : Extra configuration settings for hyperparameter tuning with the downstream model
+     * tuning_method : Method (TrainValidationSplit / CrossValidator) to use for hyperparameter tuning.
+	 * seed          : Random Seed to set for all data split / algorithm training tasks for reproducibility in result. 
     **/
     vista = Vista("vista-example", 32, 8, 8, 'alexnet', 4, 0, 'hdfs://../foods.csv',
-                      'hdfs://.../images', 20129, 130, model_name='LogisticRegression', extra_config={})
+                      'hdfs://.../images', 20129, 130, model_name='LogisticRegression', extra_config={}, 
+                      tuning_method=None, seed=2019)
     
     //possible values for model_name -> {'LogisticRegression', 'LinearSVC', 'DecisionTreeClassifier', 'GBTClassifier', 'RandomForestClassifier', 'OneVsRest'}
+    //possible values for tuning_method -> {'TrainValidationSplit', 'CrossValidator'}
     
     // extra_config takes in a dictionary of chosen model's attribute names and list of values to explore as key-value pairs for k-Fold Cross Validation. It can also take `numFolds` for the k value. 
     // extra_config is applicable for all currently supported downstream models except 'OneVsRest'.
