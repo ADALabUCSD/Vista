@@ -35,7 +35,8 @@ from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.ml.feature import StringIndexer, HashingTF, Tokenizer, IndexToString
 from pyspark.ml.tuning import CrossValidator, ParamGridBuilder, TrainValidationSplit
 
-def downstream_ml_func(features_df, results_dict, layer_index, model_name='LogisticRegression', extra_config={}, tuning_method=None, seed=2019):
+def downstream_ml_func(features_df, results_dict, layer_index, model_name='LogisticRegression', extra_config={}, 
+		       tuning_method=None, seed=2019, test_size=0.2):
 
     def hyperparameter_tuned_model(clf, train_df):
 	pipeline = Pipeline(stages=[clf])
@@ -68,12 +69,12 @@ def downstream_ml_func(features_df, results_dict, layer_index, model_name='Logis
                           evaluator=evaluator,
 			  seed=seed,
                           # 80% of the data will be used for training, 20% for validation.
-                          trainRatio=0.8)
+                          trainRatio=1-test_size)
 	
         # Run cross-validation, and choose the best set of parameters.
         return val_model.fit(train_df)
 
-    train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=seed)
+    train_df, test_df = features_df.randomSplit([1-test_size, test_size], seed=seed)
 
     if model_name == 'LogisticRegression':
         clf = LogisticRegression(labelCol="label", featuresCol="features", maxIter=10, regParam=0.1)
@@ -144,14 +145,14 @@ class Vista(object):
 
     def __init__(self, name, mem_sys, cpu_sys, n_nodes, model, n_layers, start_layer, struct_input,
                  image_input, n_records, dS, mem_sys_rsv=3, enable_sys_config_optzs=True, gpu=False, tot_gpu_mem=0, model_name='LogisticRegression', 
-		 extra_config={}, tuning_method=None, seed=2019):
+		 extra_config={}, tuning_method=None, seed=2019, test_size=0.2):
         """
             Initializing the Vista Optimizer
         :param name: Name for the Spark job
         :param mem_sys: Amount of memory available in s system node
         :param cpu_sys: Number of CPUs available in a system node
         :param n_nodes: Number of nodes in the Spark cluster
-        :param model:   CNN model name
+        :param model: CNN model name
         :param n_layers: Number of layers in the CNN to be explored
         :param start_layer: Layer index of the CNN input. Zero means input is raw images
         :param struct_input: HDFS path to the structured input file
@@ -166,6 +167,7 @@ class Vista(object):
 	:param extra_config: Extra configuration settings for hyperparameter tuning with the downstream model
 	:param tuning_method: Method (TrainValidationSplit / CrossValidator) to use for hyperparameter tuning.
 	:param seed: Random Seed to set for all data split / algorithm training tasks for reproducibility in result 
+	:param test_size: Fraction of dataset to be chosen for train-test and train-validation split
         """
         self.name = name
         self.mem_sys = math.floor(mem_sys)
@@ -186,6 +188,7 @@ class Vista(object):
 	self.extra_config = extra_config
 	self.tuning_method = tuning_method
 	self.seed = seed
+	self.test_size = test_size
 
         self.inf = 'staged'
         self.operator = 'after-join'
@@ -311,7 +314,7 @@ class Vista(object):
                     range(1, 1 + self.n_layers)):
                 evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, -1 * layer_index, 
 		    				model_name=self.model_name, tuning_method=self.tuning_method, 
-						extra_config=self.extra_config, seed=self.seed)
+						extra_config=self.extra_config, seed=self.seed, test_size=self.test_size)
 
             features_df._jdf.unpersist()
         elif self.inf == 'staged':
@@ -346,7 +349,7 @@ class Vista(object):
 
                 evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, layer_index, 
 						model_name=self.model_name, tuning_method=self.tuning_method, 
-						extra_config=self.extra_config, seed=self.seed)
+						extra_config=self.extra_config, seed=self.seed, test_size=self.test_size)
 
                 if features_df_prev is not None: features_df_prev._jdf.unpersist()
                 features_df_prev = features_df
@@ -379,7 +382,7 @@ class Vista(object):
             merged_features_df = get_feature_projections(sc, features_df, 1, [shape])[0]
             evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, self.start_layer, 
 					    model_name=self.model_name, tuning_method=self.tuning_method, 
-					    extra_config=self.extra_config, seed=self.seed)
+					    extra_config=self.extra_config, seed=self.seed, test_size=self.test_size)
 
         input_df = features_df.select(col('id'), col('features'), col('label'),
                                       serialize_cnn_features_udf(sc, col('image_features')).alias('input_layer'))
@@ -403,7 +406,7 @@ class Vista(object):
                     range(1, 1 + self.n_layers)):
                 evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, -1 * layer_index, 
 						model_name=self.model_name, tuning_method=self.tuning_method, 
-						extra_config=self.extra_config, seed=self.seed)
+						extra_config=self.extra_config, seed=self.seed, test_size=self.test_size)
                 prev_features_df._jdf.unpersist()
 
             features_df._jdf.unpersist()
@@ -417,7 +420,8 @@ class Vista(object):
 
                 merged_features_df = get_feature_projections(sc, features_df, 1, [shape])[0]
                 evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, layer_index, 
-						model_name=self.model_name, extra_config=self.extra_config, seed=self.seed)
+						model_name=self.model_name, tuning_method=self.tuning_method, 
+						extra_config=self.extra_config, seed=self.seed, test_size=self.test_size)
 
                 prev_features_df._jdf.unpersist()
                 prev_features_df = features_df
