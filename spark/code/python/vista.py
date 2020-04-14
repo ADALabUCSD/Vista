@@ -32,10 +32,11 @@ sys.path.append('../code/python/cnn')
 from pyspark.ml import Pipeline
 from pyspark.ml.classification import LogisticRegression, LinearSVC, DecisionTreeClassifier, GBTClassifier, RandomForestClassifier, MultilayerPerceptronClassifier, OneVsRest
 from pyspark.ml.evaluation import MulticlassClassificationEvaluator
-from pyspark.ml.feature import StringIndexer
-from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
+from pyspark.ml.feature import StringIndexer, HashingTF, Tokenizer, IndexToString
+from pyspark.ml.tuning import CrossValidator, ParamGridBuilder, TrainValidationSplit
 
-def downstream_ml_func(features_df, results_dict, layer_index, model_name='LogisticRegression', extra_config={}):
+def downstream_ml_func(features_df, results_dict, layer_index, model_name='LogisticRegression', extra_config={}, 
+		       tuning_method=None, seed=2019, test_size=0.2):
 
     def hyperparameter_tuned_model(clf, train_df):
 	pipeline = Pipeline(stages=[clf])
@@ -47,53 +48,66 @@ def downstream_ml_func(features_df, results_dict, layer_index, model_name='Logis
             paramGrid = paramGrid.addGrid(eval('clf.'+i), extra_config[i])
 
         paramGrid = paramGrid.build()
+	evaluator = MulticlassClassificationEvaluator()
 
-	if 'numFolds' in extra_config:
-	    numFolds = extra_config['numFolds']
-	else:
-	    numFolds = 3 # default
+	if tuning_method == 'CrossValidator':
 
-        crossval = CrossValidator(estimator=pipeline,
-                      estimatorParamMaps=paramGrid,
-                      evaluator=MulticlassClassificationEvaluator(),
-                      numFolds=numFolds)
+	    if 'numFolds' in extra_config:
+	        numFolds = extra_config['numFolds']
+	    else:
+	        numFolds = 3 # default
+
+            val_model = CrossValidator(estimator=pipeline,
+                          estimatorParamMaps=paramGrid,
+                          evaluator=evaluator,
+                          numFolds=numFolds, seed=seed)
+
+	if tuning_method == 'TrainValidationSplit':
+
+	    val_model = TrainValidationSplit(estimator=pipeline,
+                          estimatorParamMaps=paramGrid,
+                          evaluator=evaluator,
+			  seed=seed,
+                          # 80% of the data will be used for training, 20% for validation.
+                          trainRatio=1-test_size)
+	
         # Run cross-validation, and choose the best set of parameters.
-        return crossval.fit(train_df)
+        return val_model.fit(train_df)
 
-    train_df, test_df = features_df.randomSplit([0.8, 0.2], seed=2019)
+    train_df, test_df = features_df.randomSplit([1-test_size, test_size], seed=seed)
 
     if model_name == 'LogisticRegression':
         clf = LogisticRegression(labelCol="label", featuresCol="features", maxIter=10, regParam=0.1)
 
     if model_name == 'LinearSVC':
         clf = LinearSVC(maxIter=5, regParam=0.01)
-    
+
     if model_name == 'DecisionTreeClassifier':
         stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
         si_model = stringIndexer.fit(train_df)
         train_df = si_model.transform(train_df)
         
-	clf = DecisionTreeClassifier(maxDepth=2, labelCol="indexed")
+	clf = DecisionTreeClassifier(maxDepth=2, labelCol="indexed", seed=seed)
 
     if model_name == 'GBTClassifier':
         stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
         si_model = stringIndexer.fit(train_df)
         train_df = si_model.transform(train_df)
         
-	clf = GBTClassifier(labelCol="label", featuresCol="features", maxIter=50, maxDepth=5)
-    
+	clf = GBTClassifier(labelCol="label", featuresCol="features", maxIter=50, maxDepth=5, seed=seed)
+
     if model_name == 'RandomForestClassifier':
         stringIndexer = StringIndexer(inputCol="label", outputCol="indexed")
         si_model = stringIndexer.fit(train_df)
         td = si_model.transform(train_df)
         
-	clf = RandomForestClassifier(labelCol="label", featuresCol="features")
-    
+	clf = RandomForestClassifier(labelCol="label", featuresCol="features", seed=seed)
+
     if model_name == 'OneVsRest':
         lr = LogisticRegression(labelCol="label", featuresCol="features", maxIter=50, regParam=0.5)
         clf = OneVsRest(labelCol="label", featuresCol="features", predictionCol="prediction", classifier=lr)
-    
-    if extra_config != {}:
+
+    if tuning_method is not None:
         model = hyperparameter_tuned_model(clf, train_df)
     else:
         model = clf.fit(train_df)
@@ -130,14 +144,15 @@ class Vista(object):
     }
 
     def __init__(self, name, mem_sys, cpu_sys, n_nodes, model, n_layers, start_layer, struct_input,
-                 image_input, n_records, dS, mem_sys_rsv=3, enable_sys_config_optzs=True, gpu=False, tot_gpu_mem=0, model_name='LogisticRegression', extra_config={}):
+                 image_input, n_records, dS, mem_sys_rsv=3, enable_sys_config_optzs=True, gpu=False, tot_gpu_mem=0, model_name='LogisticRegression', 
+		 extra_config={}, tuning_method=None, seed=2019, test_size=0.2):
         """
             Initializing the Vista Optimizer
         :param name: Name for the Spark job
         :param mem_sys: Amount of memory available in s system node
         :param cpu_sys: Number of CPUs available in a system node
         :param n_nodes: Number of nodes in the Spark cluster
-        :param model:   CNN model name
+        :param model: CNN model name
         :param n_layers: Number of layers in the CNN to be explored
         :param start_layer: Layer index of the CNN input. Zero means input is raw images
         :param struct_input: HDFS path to the structured input file
@@ -150,6 +165,9 @@ class Vista(object):
         :param tot_gpu_mem: If GPU availabel total GPU memory
 	:param ml_model: Name of the (PySpark MLLib) Downstream ML Model to run in the Vista optimizer
 	:param extra_config: Extra configuration settings for hyperparameter tuning with the downstream model
+	:param tuning_method: Method (TrainValidationSplit / CrossValidator) to use for hyperparameter tuning.
+	:param seed: Random Seed to set for all data split / algorithm training tasks for reproducibility in result 
+	:param test_size: Fraction of dataset to be chosen for train-test and train-validation split
         """
         self.name = name
         self.mem_sys = math.floor(mem_sys)
@@ -168,6 +186,9 @@ class Vista(object):
         self.tot_gpu_mem = tot_gpu_mem
 	self.model_name = model_name
 	self.extra_config = extra_config
+	self.tuning_method = tuning_method
+	self.seed = seed
+	self.test_size = test_size
 
         self.inf = 'staged'
         self.operator = 'after-join'
@@ -204,6 +225,9 @@ class Vista(object):
         conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         conf.set("spark.shuffle.reduceLocality.enabled", "false")
 
+	conf.set("spark.kryoserializer.buffer.max", "1024") # FOR MLP !
+	conf.set("spark.driver.maxResultSize", "0g")
+
         if self.enable_sys_config_optzs and self.num_partitions > 0:
             image_dir_size = get_dir_size(self.image_input)
             if self.num_partitions > image_dir_size / 10485760:
@@ -234,6 +258,9 @@ class Vista(object):
                     raise AttributeError(self.model_name + ' has no attribute \'' + i + '\'')
                 if type(self.extra_config[i]) != list:
                     raise TypeError('The specified parameter(s) of ', i, 'in extra_config must be in a list!')
+
+	if self.tuning_method is not None and self.tuning_method not in ['TrainValidationSplit', 'CrossValidator']:
+	    raise AttributeError('The tuning model parameter should be one of \'TrainValidationSplit\' or \'CrossValidator\'.')
 
         return sc, sql_context
 
@@ -285,7 +312,9 @@ class Vista(object):
             for merged_features_df, layer_index in zip(
                     get_feature_projections(sc, sliced_features_df, self.n_layers, shapes),
                     range(1, 1 + self.n_layers)):
-                evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, -1 * layer_index, model_name=self.model_name, extra_config=self.extra_config)
+                evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, -1 * layer_index, 
+		    				model_name=self.model_name, tuning_method=self.tuning_method, 
+						extra_config=self.extra_config, seed=self.seed, test_size=self.test_size)
 
             features_df._jdf.unpersist()
         elif self.inf == 'staged':
@@ -318,7 +347,9 @@ class Vista(object):
 
                 merged_features_df = get_feature_projections(sc, features_df, 1, [shape])[0]
 
-                evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, layer_index, model_name=self.model_name, extra_config=self.extra_config)
+                evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, layer_index, 
+						model_name=self.model_name, tuning_method=self.tuning_method, 
+						extra_config=self.extra_config, seed=self.seed, test_size=self.test_size)
 
                 if features_df_prev is not None: features_df_prev._jdf.unpersist()
                 features_df_prev = features_df
@@ -349,7 +380,9 @@ class Vista(object):
                 shape = ResNet50.transfer_layers_shapes[self.start_layer]
 
             merged_features_df = get_feature_projections(sc, features_df, 1, [shape])[0]
-            evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, self.start_layer, model_name=self.model_name, extra_config=self.extra_config)
+            evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, self.start_layer, 
+					    model_name=self.model_name, tuning_method=self.tuning_method, 
+					    extra_config=self.extra_config, seed=self.seed, test_size=self.test_size)
 
         input_df = features_df.select(col('id'), col('features'), col('label'),
                                       serialize_cnn_features_udf(sc, col('image_features')).alias('input_layer'))
@@ -371,7 +404,9 @@ class Vista(object):
             for merged_features_df, layer_index in zip(
                     get_feature_projections(sc, sliced_features_df, num_layers_to_explore, shapes),
                     range(1, 1 + self.n_layers)):
-                evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, -1 * layer_index, model_name=self.model_name, extra_config=self.extra_config)
+                evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, -1 * layer_index, 
+						model_name=self.model_name, tuning_method=self.tuning_method, 
+						extra_config=self.extra_config, seed=self.seed, test_size=self.test_size)
                 prev_features_df._jdf.unpersist()
 
             features_df._jdf.unpersist()
@@ -384,7 +419,9 @@ class Vista(object):
                 features_df._jdf.persist(sc._getJavaStorageLevel(self.storage_level))
 
                 merged_features_df = get_feature_projections(sc, features_df, 1, [shape])[0]
-                evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, layer_index, model_name=self.model_name, extra_config=self.extra_config)
+                evaluation_results = downstream_ml_func(merged_features_df, evaluation_results, layer_index, 
+						model_name=self.model_name, tuning_method=self.tuning_method, 
+						extra_config=self.extra_config, seed=self.seed, test_size=self.test_size)
 
                 prev_features_df._jdf.unpersist()
                 prev_features_df = features_df
@@ -490,7 +527,8 @@ if __name__ == "__main__":
     prev_time = time.time()
     # mem_sys_rsv is an optional parameter. If not set a default value of 3 will be used.
     vista = Vista("vista-example", 32, 8, 8, 'alexnet', 3, 0, 'hdfs://spark-master:9000/foods_sample.csv',
-                      'hdfs://spark-master:9000/foods_images', 20129, 130, mem_sys_rsv=3, model_name='LogisticRegression', extra_config={})
+                      'hdfs://spark-master:9000/foods_images', 20129, 130, mem_sys_rsv=3, model_name='LogisticRegression', 
+		       extra_config={'maxIter': [5, 15], 'regParam': [0.01, 0.1]}, tuning_method='TrainValidationSplit', seed=2019)
 
     # Optional overrides
     #vista.override_inference_type('bulk')
